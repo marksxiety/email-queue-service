@@ -1,1 +1,6 @@
 fastapi
+uvicorn[standard]
+python-dotenv
+psycopg2-binary
+pandas
+jinja2
