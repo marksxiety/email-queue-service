@@ -8,6 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import json
 from app.config import config
+import time
 
 # Load templates
 # Priority: user-added templates (app/user/templates) override default templates (app/templates)
@@ -92,35 +93,41 @@ def update_email_status(email_id):
         conn.close()
 
 def initialize_worker():
-    pending_emails = get_on_queue_emails()
-    if pending_emails is False or pending_emails.empty:
-        print_logging("info", "No emails to process.")
-        return
-
-    for row_index, row_series in pending_emails.iterrows():
-        email_id = row_series["id"]
-        subject = row_series["subject"]
-        template_name = row_series["email_template"]
-        email_data = row_series["email_data"]
-
-        # Parse JSON data if needed
-        if isinstance(email_data, str):
-            try:
-                email_data = json.loads(email_data)
-            except json.JSONDecodeError as e:
-                print_logging("error", f"Invalid JSON for email {email_id}: {str(e)}")
+    while True:
+        try:
+            pending_emails = get_on_queue_emails()
+            if pending_emails is False or pending_emails.empty:
+                print_logging("info", "No emails to process.")
+                time.sleep(5)
                 continue
 
-        # Render email
-        body = render_email_template(template_name, email_data)
+            for row_index, row_series in pending_emails.iterrows():
+                email_id = row_series["id"]
+                subject = row_series["subject"]
+                template_name = row_series["email_template"]
+                email_data = row_series["email_data"]
 
-        # Send email
-        success = send_email_via_smtp(subject, body)
-        if success:
-            print_logging("info", f"Email {email_id} sent successfully!")
-            update_email_status(email_id)
-        else:
-            print_logging("error", f"Failed to send email {email_id}")
+                # Parse JSON data if needed
+                if isinstance(email_data, str):
+                    try:
+                        email_data = json.loads(email_data)
+                    except json.JSONDecodeError as e:
+                        print_logging("error", f"Invalid JSON for email {email_id}: {str(e)}")
+                        continue
 
+                # Render email
+                body = render_email_template(template_name, email_data)
+
+                # Send email
+                success = send_email_via_smtp(subject, body)
+                if success:
+                    print_logging("info", f"Email {email_id} sent successfully!")
+                    update_email_status(email_id)
+                else:
+                    print_logging("error", f"Failed to send email {email_id}")
+        except Exception as e:
+            print_logging('critical', f"Unidentified Error occured on worker due to: {e}")
+            
+        time.sleep(5)
 if __name__ == "__main__":
     initialize_worker()
