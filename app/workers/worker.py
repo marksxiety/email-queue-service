@@ -8,39 +8,7 @@ from email.mime.multipart import MIMEMultipart
 import json
 from app.config import config, jinja_env
 import time
-
-def get_on_queue_emails():
-    conn = connect()
-    if conn is None:
-        print_logging("error", "Failed to connect to database")
-        return False
-
-    cursor = None
-    try:
-        query = """
-            SELECT eq.id, eq.email_type, eq.subject, eq.email_template, eq.email_data, eq.status,
-                   et.to_address, et.cc_addresses, et.bcc_addresses
-            FROM email_queues eq
-            JOIN email_types et ON eq.email_type = et.type
-            WHERE eq.status = 0
-            ORDER BY eq.priority_level ASC
-        """
-        cursor = conn.cursor()
-        cursor.execute(query)
-        results = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-
-        emails_df = pd.DataFrame(results, columns=columns)
-        return emails_df
-
-    except Exception as e:
-        print_logging("error", f"Error querying emails: {str(e)}")
-        return False
-
-    finally:
-        if cursor:
-            cursor.close()
-        conn.close()
+import pika
         
 def render_email_template(template_name, data):
     template = jinja_env.get_template(f"{template_name}.html")
@@ -52,21 +20,24 @@ def send_email_via_smtp(subject, body, to_address, cc_addresses=None, bcc_addres
     sender_email = config.SMTP_USER
     password = config.SMTP_PASSWORD
 
+    sender_email = None if sender_email is None else str(sender_email)
+    password = None if password is None else str(password)
+
     message = MIMEMultipart()
     message["From"] = sender_email
 
     to_list = to_address if isinstance(to_address, list) else [to_address]
-    message["To"] = ", ".join(to_list)
+    message["To"] = ", ".join([str(a) for a in to_list if a is not None])
 
     if cc_addresses:
         cc_list = cc_addresses if isinstance(cc_addresses, list) else [cc_addresses]
-        message["Cc"] = ", ".join(cc_list)
+        message["Cc"] = ", ".join([str(a) for a in cc_list if a is not None])
 
     if bcc_addresses:
         bcc_list = bcc_addresses if isinstance(bcc_addresses, list) else [bcc_addresses]
-        message["Bcc"] = ", ".join(bcc_list)
+        message["Bcc"] = ", ".join([str(a) for a in bcc_list if a is not None])
 
-    message["Subject"] = subject
+    message["Subject"] = str(subject)
     message.attach(MIMEText(body, "html"))
 
     all_recipients = to_list.copy()
@@ -77,15 +48,17 @@ def send_email_via_smtp(subject, body, to_address, cc_addresses=None, bcc_addres
         bcc_list = bcc_addresses if isinstance(bcc_addresses, list) else [bcc_addresses]
         all_recipients.extend(bcc_list)
 
+    all_recipients = [str(a) for a in all_recipients if a is not None]
+
     context = ssl.create_default_context()
     try:
         with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
             server.login(sender_email, password)
             server.sendmail(sender_email, all_recipients, message.as_string())
-        return True
+        return True, "success"
     except Exception as e:
         print_logging("error", f"SMTP error: {str(e)}")
-        return False
+        return False, e
 
 def update_email_status(status, email_id):
     """
@@ -114,45 +87,85 @@ def update_email_status(status, email_id):
             cursor.close()
         conn.close()
 
-def initialize_worker():
-    while True:
+def parse_address_value(value):
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
         try:
-            pending_emails = get_on_queue_emails()
-            if pending_emails is False or pending_emails.empty:
-                print_logging("info", "No emails to process.")
-                time.sleep(5)
-                continue
+            import ast
+            return ast.literal_eval(value)
+        except:
+            return [value]
+    return [value]
 
-            for row_index, row_series in pending_emails.iterrows():
-                template_name = row_series["email_template"]
-                email_id = row_series["id"]
-                subject = row_series["subject"]
-                to_address = row_series["to_address"]
-                cc_addresses = row_series["cc_addresses"]
-                bcc_addresses = row_series["bcc_addresses"]
-                email_data = row_series["email_data"]
+def callback(ch, method, properties, body):
+    try:
+        body_str = body.decode('utf-8') if isinstance(body, bytes) else body
+        email_data = json.loads(body_str)
+        email_id = email_data["id"]
+        template_name = email_data["email_template"]
+        subject = str(email_data["subject"])
+        to_address = parse_address_value(email_data["to_address"])
+        cc_addresses = parse_address_value(email_data["cc_addresses"])
+        bcc_addresses = parse_address_value(email_data["bcc_addresses"])
+        email_content = email_data["email_data"]
+        
+        if isinstance(email_content, str):
+            try:
+                email_content = json.loads(email_content)
+            except json.JSONDecodeError as e:
+                print_logging("error", f"Invalid JSON for email {email_id}: {str(e)}")
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+                return
+        
+        body_content = render_email_template(template_name, email_content)
+        
+        success, message = send_email_via_smtp(subject, body_content, to_address, cc_addresses, bcc_addresses)
+        if success:
+            print_logging("info", f"Email {email_id} sent successfully!")
+            update_email_status(1, email_id)
+        else:
+            print_logging("error", f"Failed to send email {email_id} due to: {message}")
+            update_email_status(2, email_id)
+        
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    except json.JSONDecodeError as e:
+        print_logging("error", f"Invalid JSON message format: {str(e)}")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    except Exception as e:
+        print_logging("error", f"Error processing message: {str(e)}")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
-                # Parse JSON data if needed
-                if isinstance(email_data, str):
-                    try:
-                        email_data = json.loads(email_data)
-                    except json.JSONDecodeError as e:
-                        print_logging("error", f"Invalid JSON for email {email_id}: {str(e)}")
-                        continue
 
-                # Render email
-                body = render_email_template(template_name, email_data)
-
-                # Send email
-                success = send_email_via_smtp(subject, body, to_address, cc_addresses, bcc_addresses)
-                if success:
-                    print_logging("info", f"Email {email_id} sent successfully!")
-                    update_email_status(1, email_id)
-                else:
-                    print_logging("error", f"Failed to send email {email_id}")
-        except Exception as e:
-            print_logging('critical', f"Unidentified Error occured on worker due to: {e}")
-            
+def initialize_worker():
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host=config.RABBITMQ_HOST,
+            port=config.RABBITMQ_PORT,
+            virtual_host=config.RABBITMQ_VHOST,
+            credentials=pika.PlainCredentials(config.RABBITMQ_USER, config.RABBITMQ_PASSWORD)
+        ))
+        channel = connection.channel()
+        
+        channel.queue_declare(queue=config.EMAIL_QUEUE_HIGH, durable=True)
+        channel.queue_declare(queue=config.EMAIL_QUEUE_NORMAL, durable=True)
+        channel.queue_declare(queue=config.EMAIL_QUEUE_LOW, durable=True)
+        
+        channel.basic_qos(prefetch_count=1)
+        
+        print_logging("info", "Worker started and listening to queues...")
+        
+        channel.basic_consume(queue=config.EMAIL_QUEUE_HIGH, on_message_callback=callback)
+        channel.basic_consume(queue=config.EMAIL_QUEUE_NORMAL, on_message_callback=callback)
+        channel.basic_consume(queue=config.EMAIL_QUEUE_LOW, on_message_callback=callback)
+        
+        channel.start_consuming()
+    except Exception as e:
+        print_logging("critical", f"Worker error: {str(e)}")
         time.sleep(5)
+        initialize_worker()
+        
 if __name__ == "__main__":
     initialize_worker()
