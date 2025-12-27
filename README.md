@@ -26,7 +26,7 @@ graph LR
     D -.->| ㅤInsert Pending Emailㅤ | E
     D --> F
     F --> G
-    G -.->|ㅤUpdate Sent/Failed ㅤStatus| E
+    G -.->|ㅤUpdate Email Statusㅤ| E
     G --> H
 ```
 
