@@ -1,5 +1,5 @@
 from app.utils.logger import print_logging
-from app.utils.database_connect import connect
+from app.database.transactions import update_email_status
 import pandas as pd
 import smtplib
 import ssl
@@ -60,32 +60,6 @@ def send_email_via_smtp(subject, body, to_address, cc_addresses=None, bcc_addres
         print_logging("error", f"SMTP error: {str(e)}")
         return False, e
 
-def update_email_status(status, email_id):
-    """
-    Updates the delivery status of an email in the queue.
-    
-    Status Levels:
-    - 0: Pending (In queue, not yet processed)
-    - 1: Sent (Successfully delivered)
-    - 2: Failed (Permanent or temporary delivery failure)
-    """
-    conn = connect()
-    if conn is None:
-        print_logging("error", f"Database connection unavailable. Cannot update email {email_id}")
-        return
-
-    cursor = None
-    try:
-        query = "UPDATE email_queues SET status = %s, sent_at = NOW() WHERE id = %s"      
-        cursor = conn.cursor()
-        cursor.execute(query, (status, email_id))
-        conn.commit()
-    except Exception as e:
-        print_logging("error", f"Database error while updating email {email_id}: {str(e)}")
-    finally:
-        if cursor:
-            cursor.close()
-        conn.close()
 
 def parse_address_value(value):
     if value is None:

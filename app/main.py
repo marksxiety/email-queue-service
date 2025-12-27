@@ -3,64 +3,10 @@ from app.config import config, jinja_env
 import uvicorn
 from pydantic import BaseModel, field_validator
 from typing import Dict, Any
-from app.utils.database_connect import connect
+from app.database.transactions import insert_email_queues
 from app.utils.logger import print_logging
 import json
 import pika
-
-def insert_email_queues(payload):
-    conn = connect()
-    if conn is None:
-        print_logging("error", "Failed to connect to database")
-        return False
-    cursor = None
-    try:
-        query = """
-           INSERT INTO email_queues (sender, email_type, subject, email_template, email_data, priority_level)
-           VALUES (%s, %s, %s, %s, %s, %s)
-           RETURNING id
-        """
-        cursor = conn.cursor()
-        email_data_json = json.dumps(payload.email_data)
-        cursor.execute(query, (
-            payload.sender,
-            payload.email_type,
-            payload.subject,
-            payload.email_template,
-            email_data_json,
-            payload.priority_level
-        ))
-        email_id = cursor.fetchone()[0]
-        conn.commit()
-        
-        query = """
-            SELECT et.to_address, et.cc_addresses, et.bcc_addresses
-            FROM email_types et
-            WHERE et.type = %s
-        """
-        cursor.execute(query, (payload.email_type,))
-        result = cursor.fetchone()
-        
-        email_data = {
-            "id": email_id,
-            "email_type": payload.email_type,
-            "subject": payload.subject,
-            "email_template": payload.email_template,
-            "email_data": email_data_json,
-            "to_address": result[0],
-            "cc_addresses": result[1],
-            "bcc_addresses": result[2]
-        }
-        return email_data
-
-    except Exception as e:
-        print_logging("error", f"Error inserting in email queues: {str(e)}")
-        return False
-
-    finally:
-        if cursor:
-            cursor.close()
-        conn.close()
 
 def publish_to_rabbitmq(email_data, priority_level):
     try:
