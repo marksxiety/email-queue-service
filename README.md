@@ -13,8 +13,8 @@ graph LR
     end
 
     subgraph Email Queue Service
-        D[FastAPI API]
-        E[(PostgreSQL)]
+        D[API]
+        E[(Database)]
         F[RabbitMQ]
         G[Worker]
         H[SMTP Server]
