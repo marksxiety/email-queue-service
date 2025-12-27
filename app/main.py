@@ -1,16 +1,33 @@
 from fastapi import FastAPI
 from app.config import config
 import uvicorn
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Dict, Any
+from jinja2 import Environment, FileSystemLoader, ChoiceLoader
+from pydantic import BaseModel, field_validator
 
+env = Environment(loader=ChoiceLoader([
+    FileSystemLoader("app/user/templates"),   # user-added or uploaded templates
+    FileSystemLoader("app/templates")         # default/base templates
+]))
 class EmailQueueRequest(BaseModel):
-    sender: str
-    email_type: str
-    subject: str
-    email_template: str
+    sender: Any
+    email_type: Any
+    subject: Any
+    email_template: Any
     email_data: Dict[str, Any]
     priority_level: int
+
+    @field_validator('email_template')
+    @classmethod
+    def validate_template_exists(cls, v):
+        template_name = v if v.endswith('.html') else f"{v}.html"
+        try:
+            env.get_template(template_name)
+            return template_name
+        except Exception:
+            # This triggers the 422 Unprocessable Entity error
+            raise ValueError(f"Template '{template_name}' does not exist in templates folders.")
 
 app = FastAPI()
 
