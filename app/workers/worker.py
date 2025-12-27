@@ -65,20 +65,28 @@ def send_email_via_smtp(subject, body):
         print_logging("error", f"SMTP error: {str(e)}")
         return False
 
-def update_email_status(email_id):
+def update_email_status(status, email_id):
+    """
+    Updates the delivery status of an email in the queue.
+    
+    Status Levels:
+    - 0: Pending (In queue, not yet processed)
+    - 1: Sent (Successfully delivered)
+    - 2: Failed (Permanent or temporary delivery failure)
+    """
     conn = connect()
     if conn is None:
-        print_logging("error", f"Failed to connect to DB to update email {email_id}")
+        print_logging("error", f"Database connection unavailable. Cannot update email {email_id}")
         return
 
     cursor = None
     try:
-        query = "UPDATE email_queues SET status = 1, sent_at = NOW() WHERE id = %s"
+        query = "UPDATE email_queues SET status = %s, sent_at = NOW() WHERE id = %s"      
         cursor = conn.cursor()
-        cursor.execute(query, (email_id,))
+        cursor.execute(query, (status, email_id))
         conn.commit()
     except Exception as e:
-        print_logging("error", f"Failed to update email {email_id}: {str(e)}")
+        print_logging("error", f"Database error while updating email {email_id}: {str(e)}")
     finally:
         if cursor:
             cursor.close()
@@ -114,7 +122,7 @@ def initialize_worker():
                 success = send_email_via_smtp(subject, body)
                 if success:
                     print_logging("info", f"Email {email_id} sent successfully!")
-                    update_email_status(email_id)
+                    update_email_status(1, email_id)
                 else:
                     print_logging("error", f"Failed to send email {email_id}")
         except Exception as e:
