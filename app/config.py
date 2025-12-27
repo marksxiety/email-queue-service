@@ -20,7 +20,7 @@ class Config:
     
     EMAIL_QUEUE_HIGH = os.getenv("EMAIL_QUEUE_HIGH", "email.high")
     EMAIL_QUEUE_NORMAL = os.getenv("EMAIL_QUEUE_NORMAL", "email.normal")
-    EMAIL_QUEUE_BULK = os.getenv("EMAIL_QUEUE_BULK", "email.bulk")
+    EMAIL_QUEUE_LOW = os.getenv("EMAIL_QUEUE_LOW", "email.low")
     
     SMTP_HOST = os.getenv("SMTP_HOST")
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
