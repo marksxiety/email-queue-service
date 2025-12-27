@@ -4,3 +4,4 @@ python-dotenv
 psycopg2-binary
 pandas
 jinja2
+pika
