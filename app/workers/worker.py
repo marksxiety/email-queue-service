@@ -18,8 +18,12 @@ def get_on_queue_emails():
     cursor = None
     try:
         query = """
-            SELECT id, email_type, subject, email_template, email_data, status 
-            FROM email_queues  WHERE status = 0 ORDER BY priority_level ASC
+            SELECT eq.id, eq.email_type, eq.subject, eq.email_template, eq.email_data, eq.status,
+                   et.to_address, et.cc_addresses, et.bcc_addresses
+            FROM email_queues eq
+            JOIN email_types et ON eq.email_type = et.type
+            WHERE eq.status = 0
+            ORDER BY eq.priority_level ASC
         """
         cursor = conn.cursor()
         cursor.execute(query)
@@ -37,29 +41,47 @@ def get_on_queue_emails():
         if cursor:
             cursor.close()
         conn.close()
-
+        
 def render_email_template(template_name, data):
     template = jinja_env.get_template(f"{template_name}.html")
     return template.render(**data)
 
-def send_email_via_smtp(subject, body):
+def send_email_via_smtp(subject, body, to_address, cc_addresses=None, bcc_addresses=None):
     smtp_server = config.SMTP_HOST
     port = config.SMTP_PORT
     sender_email = config.SMTP_USER
     password = config.SMTP_PASSWORD
-    receiver_email = "markciril.jamon@gmail.com"
 
     message = MIMEMultipart()
     message["From"] = sender_email
-    message["To"] = receiver_email
+
+    to_list = to_address if isinstance(to_address, list) else [to_address]
+    message["To"] = ", ".join(to_list)
+
+    if cc_addresses:
+        cc_list = cc_addresses if isinstance(cc_addresses, list) else [cc_addresses]
+        message["Cc"] = ", ".join(cc_list)
+
+    if bcc_addresses:
+        bcc_list = bcc_addresses if isinstance(bcc_addresses, list) else [bcc_addresses]
+        message["Bcc"] = ", ".join(bcc_list)
+
     message["Subject"] = subject
     message.attach(MIMEText(body, "html"))
+
+    all_recipients = to_list.copy()
+    if cc_addresses:
+        cc_list = cc_addresses if isinstance(cc_addresses, list) else [cc_addresses]
+        all_recipients.extend(cc_list)
+    if bcc_addresses:
+        bcc_list = bcc_addresses if isinstance(bcc_addresses, list) else [bcc_addresses]
+        all_recipients.extend(bcc_list)
 
     context = ssl.create_default_context()
     try:
         with smtplib.SMTP_SSL(smtp_server, port, context=context) as server:
             server.login(sender_email, password)
-            server.sendmail(sender_email, receiver_email, message.as_string())
+            server.sendmail(sender_email, all_recipients, message.as_string())
         return True
     except Exception as e:
         print_logging("error", f"SMTP error: {str(e)}")
@@ -102,9 +124,12 @@ def initialize_worker():
                 continue
 
             for row_index, row_series in pending_emails.iterrows():
+                template_name = row_series["email_template"]
                 email_id = row_series["id"]
                 subject = row_series["subject"]
-                template_name = row_series["email_template"]
+                to_address = row_series["to_address"]
+                cc_addresses = row_series["cc_addresses"]
+                bcc_addresses = row_series["bcc_addresses"]
                 email_data = row_series["email_data"]
 
                 # Parse JSON data if needed
@@ -119,7 +144,7 @@ def initialize_worker():
                 body = render_email_template(template_name, email_data)
 
                 # Send email
-                success = send_email_via_smtp(subject, body)
+                success = send_email_via_smtp(subject, body, to_address, cc_addresses, bcc_addresses)
                 if success:
                     print_logging("info", f"Email {email_id} sent successfully!")
                     update_email_status(1, email_id)
