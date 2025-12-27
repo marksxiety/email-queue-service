@@ -1,15 +1,9 @@
 from fastapi import FastAPI
-from app.config import config
+from app.config import config, jinja_env
 import uvicorn
 from pydantic import BaseModel, field_validator
 from typing import Dict, Any
-from jinja2 import Environment, FileSystemLoader, ChoiceLoader
-from pydantic import BaseModel, field_validator
 
-env = Environment(loader=ChoiceLoader([
-    FileSystemLoader("app/user/templates"),   # user-added or uploaded templates
-    FileSystemLoader("app/templates")         # default/base templates
-]))
 class EmailQueueRequest(BaseModel):
     sender: Any
     email_type: Any
@@ -23,7 +17,7 @@ class EmailQueueRequest(BaseModel):
     def validate_template_exists(cls, v):
         template_name = v if v.endswith('.html') else f"{v}.html"
         try:
-            env.get_template(template_name)
+            jinja_env.get_template(template_name)
             return template_name
         except Exception:
             # This triggers the 422 Unprocessable Entity error

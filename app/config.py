@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import os
+from jinja2 import Environment, FileSystemLoader, ChoiceLoader
 
 load_dotenv(override=True)
 
@@ -38,3 +39,8 @@ class Config:
     RETRY_DELAY_SECONDS = int(os.getenv("RETRY_DELAY_SECONDS", "30"))
 
 config = Config()
+
+jinja_env = Environment(loader=ChoiceLoader([
+    FileSystemLoader("app/user/templates"),
+    FileSystemLoader("app/templates")
+]))

@@ -1,21 +1,13 @@
 from app.utils.logger import print_logging
 from app.utils.database_connect import connect
 import pandas as pd
-from jinja2 import Environment, FileSystemLoader, ChoiceLoader
 import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import json
-from app.config import config
+from app.config import config, jinja_env
 import time
-
-# Load templates
-# Priority: user-added templates (app/user/templates) override default templates (app/templates)
-env = Environment(loader=ChoiceLoader([
-    FileSystemLoader("app/user/templates"),   # user-added or uploaded templates
-    FileSystemLoader("app/templates")         # default/base templates
-]))
 
 def get_on_queue_emails():
     conn = connect()
@@ -47,7 +39,7 @@ def get_on_queue_emails():
         conn.close()
 
 def render_email_template(template_name, data):
-    template = env.get_template(f"{template_name}.html")
+    template = jinja_env.get_template(f"{template_name}.html")
     return template.render(**data)
 
 def send_email_via_smtp(subject, body):
