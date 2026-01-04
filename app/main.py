@@ -1,12 +1,42 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from app.config import config, jinja_env
 import uvicorn
 from pydantic import BaseModel, field_validator
-from typing import Dict, Any
-from app.database.transactions import insert_email_queues
+from typing import Dict, Any, Optional, List
+from app.database.transactions import insert_email_queues, insert_email_attachments
 from app.utils.logger import print_logging
 import json
 import pika
+import hashlib
+from pathlib import Path
+import uuid
+
+def calculate_sha256(file_content: bytes) -> str:
+    """Calculate SHA256 checksum of file content"""
+    return hashlib.sha256(file_content).hexdigest()
+
+def save_attachment_to_disk(file_content: bytes, filename: str, email_queue_id: str) -> str:
+    """
+    Save attachment to disk and return the file path
+    Organize files by email_queue_id to avoid conflicts
+    """
+    # Define base upload directory
+    upload_dir = Path(config.UPLOAD_DIR if hasattr(config, 'UPLOAD_DIR') else './uploads')
+    
+    # Create directory structure: uploads/email_queue_id/
+    email_dir = upload_dir / str(email_queue_id)
+    email_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Generate unique filename to avoid conflicts
+    file_extension = Path(filename).suffix
+    unique_filename = f"{uuid.uuid4()}{file_extension}"
+    file_path = email_dir / unique_filename
+    
+    # Write file to disk
+    with open(file_path, 'wb') as f:
+        f.write(file_content)
+    
+    return str(file_path)
 
 def publish_to_rabbitmq(email_data, priority_level):
     try:
@@ -40,8 +70,52 @@ def publish_to_rabbitmq(email_data, priority_level):
         print_logging("error", f"Error publishing to RabbitMQ: {str(e)}")
         return False
 
+async def process_attachments(attachments: List[UploadFile], email_queue_id: str) -> int:
+    """Process and save attachments, return count of successfully processed files"""
+    attachment_count = 0
+    
+    for attachment in attachments:
+        try:
+            # Read file content
+            file_content = await attachment.read()
+            file_size = len(file_content)
+            
+            # Validate MIME type if config exists
+            if hasattr(config, 'ALLOWED_MIME_TYPES'):
+                if attachment.content_type not in config.ALLOWED_MIME_TYPES:
+                    print_logging("warning", f"Skipping attachment '{attachment.filename}' with disallowed MIME type '{attachment.content_type}'")
+                    continue
+            
+            # Calculate checksum
+            checksum = calculate_sha256(file_content)
+            
+            # Save file to disk
+            file_path = save_attachment_to_disk(
+                file_content, 
+                attachment.filename, 
+                email_queue_id
+            )
+            
+            # Insert attachment metadata into database
+            insert_email_attachments(
+                email_queue_id=email_queue_id,
+                file_name=attachment.filename,
+                file_path=file_path,
+                mime_type=attachment.content_type,
+                file_size=file_size,
+                checksum=checksum
+            )
+            
+            attachment_count += 1
+            print_logging("info", f"Saved attachment: {attachment.filename} for email {email_queue_id}")
+            
+        except Exception as e:
+            print_logging("error", f"Error processing attachment {attachment.filename}: {str(e)}")
+            # Continue processing other attachments even if one fails
+    
+    return attachment_count
+
 class EmailQueueRequest(BaseModel):
-    sender: Any
     email_type: Any
     subject: Any
     email_template: Any
@@ -62,27 +136,84 @@ class EmailQueueRequest(BaseModel):
 app = FastAPI()
 
 @app.post("/api/v1/emails/queue")
-async def queue_email(payload: EmailQueueRequest):
-    email_data = insert_email_queues(payload)
-    if email_data:
-        published = publish_to_rabbitmq(email_data, payload.priority_level)
-        if published:
-            return {
-                "message": "Payload received successfully",
-                "data": payload.model_dump(),
-                "email_id": email_data["id"]
-            }
-        else:
-            return {
-                "message": "Email inserted but failed to publish to queue",
-                "data": payload.model_dump(),
-                "email_id": email_data["id"]
-            }
-    else:
+async def queue_email(
+    email_type: str = Form(...),
+    subject: str = Form(...),
+    email_template: str = Form(...),
+    email_data: str = Form(...),  # This will be JSON stringified
+    priority_level: int = Form(...),
+    attachments: Optional[List[UploadFile]] = File(None)
+):
+    try:
+        # Decode the JSON stringified email_data
+        # Handle both regular JSON and escaped JSON strings
+        email_data_dict = json.loads(email_data)
+        
+        # If the result contains an "email_data" key, extract it
+        if isinstance(email_data_dict, dict) and "email_data" in email_data_dict:
+            email_data_dict = email_data_dict["email_data"]
+            
+    except json.JSONDecodeError as e:
+        print_logging("error", f"Invalid JSON in email_data: {str(e)}")
         return {
-            "message": "Failed to register  the request into email queue",
+            "message": "Invalid JSON format in email_data field",
             "data": None
         }
+    
+    # Create payload
+    payload_dict = {
+        "email_type": email_type,
+        "subject": subject,
+        "email_template": email_template,
+        "email_data": email_data_dict,
+        "priority_level": priority_level
+    }
+    
+    # Validate payload
+    try:
+        payload = EmailQueueRequest(**payload_dict)
+    except Exception as e:
+        print_logging("error", f"Payload validation failed: {str(e)}")
+        return {
+            "message": f"Payload validation failed: {str(e)}",
+            "data": None
+        }
+    
+    # Insert email queue entry
+    email_data = insert_email_queues(payload)
+    
+    if not email_data:
+        return {
+            "message": "Failed to register the request into email queue",
+            "data": None
+        }
+    
+    email_queue_id = email_data["id"]
+    attachment_count = 0
+    
+    # Process attachments if provided (BEFORE publishing to RabbitMQ)
+    if attachments:
+        attachment_count = await process_attachments(attachments, email_queue_id)
+    
+    # Publish to RabbitMQ after attachments are processed
+    published = publish_to_rabbitmq(email_data, payload.priority_level)
+    
+    response = {
+        "data": payload.model_dump(),
+        "email_id": email_data["id"]
+    }
+        
+    if published:
+        response['message'] = f"Email {email_queue_id} received and published successfully"
+    else:
+        fail_message = f"Email {email_queue_id} inserted but failed to publish to queue"
+        response['message'] = fail_message
+        print_logging('critical', fail_message)
+    
+    if attachments:
+        response["attachments_processed"] = attachment_count
+    
+    return response
     
 if __name__ == '__main__':
     uvicorn.run(app, host=config.API_HOST, port=config.API_PORT)
