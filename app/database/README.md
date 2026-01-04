@@ -22,7 +22,6 @@ Stores queued emails waiting to be sent.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | id | UUID | PRIMARY KEY, DEFAULT gen_random_uuid() | Unique identifier for the email queue entry |
-| sender | VARCHAR(100) | NOT NULL | Sender identifier |
 | email_type | VARCHAR(100) | NOT NULL, REFERENCES email_types(type) | Email type reference |
 | subject | VARCHAR(500) | NOT NULL | Email subject line |
 | email_template | VARCHAR(100) | | Template file name |
@@ -35,8 +34,9 @@ Stores queued emails waiting to be sent.
 ### Indexes
 
 - `idx_email_queues_status_priority`: (status, priority_level, created_at) - Optimizes queries for filtering by status and priority
-- `idx_email_queues_sender`: (sender) - Optimizes queries by sender
 - `idx_email_queues_type`: (email_type) - Optimizes queries by email type
+- `idx_email_attachments_queue`: (email_queue_id) - Optimizes queries for filtering attachments by email queue
+- `idx_email_attachments_mime`: (mime_type) - Optimizes queries by attachment MIME type
 
 ## SQL Schema
 
@@ -52,7 +52,6 @@ Stores queued emails waiting to be sent.
 
     CREATE TABLE email_queues (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        sender VARCHAR(100) NOT NULL,
         email_type VARCHAR(100) NOT NULL REFERENCES email_types(type),
         subject VARCHAR(500) NOT NULL,
         email_template VARCHAR(100),
@@ -65,9 +64,21 @@ Stores queued emails waiting to be sent.
         CONSTRAINT valid_priority CHECK (priority_level BETWEEN 1 AND 10)
     );
 
+    CREATE TABLE email_attachments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        email_queue_id UUID NOT NULL REFERENCES email_queues(id) ON DELETE CASCADE,
+        file_name VARCHAR(255) NOT NULL,
+        file_path TEXT NOT NULL,
+        mime_type VARCHAR(150) NOT NULL,
+        file_size BIGINT NOT NULL,
+        checksum_sha256 CHAR(64),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Indexes for faster querying
     CREATE INDEX idx_email_queues_status_priority ON email_queues(status, priority_level, created_at);
-    CREATE INDEX idx_email_queues_sender ON email_queues(sender);
     CREATE INDEX idx_email_queues_type ON email_queues(email_type);
+    CREATE INDEX idx_email_attachments_queue ON email_attachments(email_queue_id);
+    CREATE INDEX idx_email_attachments_mime ON email_attachments(mime_type);
 
 ```
