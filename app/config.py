@@ -38,6 +38,8 @@ class Config:
     MAX_RETRIES = int(os.getenv("MAX_RETRIES", "5"))
     RETRY_DELAY_SECONDS = int(os.getenv("RETRY_DELAY_SECONDS", "30"))
     
+    UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
+    
     ALLOWED_MIME_TYPES = {
         "application/pdf",
         "application/msword",

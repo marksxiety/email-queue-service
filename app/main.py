@@ -21,7 +21,7 @@ def save_attachment_to_disk(file_content: bytes, filename: str, email_queue_id: 
     Organize files by email_queue_id to avoid conflicts
     """
     # Define base upload directory
-    upload_dir = Path(config.UPLOAD_DIR if hasattr(config, 'UPLOAD_DIR') else './uploads')
+    upload_dir = Path(config.UPLOAD_DIR)
     
     # Create directory structure: uploads/email_queue_id/
     email_dir = upload_dir / str(email_queue_id)
