@@ -83,3 +83,29 @@ def update_email_status(status, email_id):
         if cursor:
             cursor.close()
         conn.close()
+
+def insert_email_attachments(email_queue_id, file_name, file_path, mime_type, file_size, checksum):
+
+    conn = connect()
+    if conn is None:
+        print_logging("error", f"Database connection unavailable. Cannot insert file attachment for email id {email_queue_id}")
+        return
+
+    cursor = None
+    try:
+        query = (
+            "INSERT INTO email_attachments "
+            "(email_queue_id, file_name, file_path, mime_type, file_size, checksum_sha256) "
+            "VALUES (%s, %s, %s, %s, %s, %s) "
+            "RETURNING id"
+        )   
+        
+        cursor = conn.cursor()
+        cursor.execute(query, (email_queue_id, file_name, file_path, mime_type, file_size, checksum))
+        conn.commit()
+    except Exception as e:
+        print_logging("error", f"Database error while inserting email attachment for queue id {email_queue_id}: {str(e)}")
+    finally:
+        if cursor:
+            cursor.close()
+        conn.close()
