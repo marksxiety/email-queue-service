@@ -11,14 +11,13 @@ def insert_email_queues(payload):
     cursor = None
     try:
         query = """
-           INSERT INTO email_queues (sender, email_type, subject, email_template, email_data, priority_level)
-           VALUES (%s, %s, %s, %s, %s, %s)
+           INSERT INTO email_queues (email_type, subject, email_template, email_data, priority_level)
+           VALUES (%s, %s, %s, %s, %s)
            RETURNING id
         """
         cursor = conn.cursor()
         email_data_json = json.dumps(payload.email_data)
         cursor.execute(query, (
-            payload.sender,
             payload.email_type,
             payload.subject,
             payload.email_template,
