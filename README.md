@@ -85,29 +85,47 @@ python app/workers/worker.py
 
 **Endpoint:** `POST /api/v1/emails/queue`
 
-**Request Body:**
+**Content-Type:** `multipart/form-data` (required - JSON format not supported)
 
-```json
-{
-  "sender": "system_automation",
-  "email_type": "welcome",
-  "subject": "Welcome to Our Platform",
-  "email_template": "default_template",
-  "email_data": {
-    "name": "John Doe",
-    "company": "Acme Corp"
-  },
-  "priority_level": 1
-}
+**Request Body (form-data):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| email_type | string | Yes | Type of email (e.g., "welcome", "notification") |
+| subject | string | Yes | Email subject line |
+| email_template | string | Yes | Template name (without .html extension) |
+| email_data | string (JSON) | Yes | Template variables as JSON string |
+| priority_level | int | Yes | Priority level (1=high, 2=normal, 3-10=low) |
+| attachments | file[] | No | Optional attachment files |
+
+**Example form-data:**
+
+```
+email_type: welcome
+subject: Welcome to Our Platform
+email_template: default_template
+email_data: {"name": "John Doe", "company": "Acme Corp"}
+priority_level: 1
+attachments: [file1.pdf, file2.jpg] (optional)
 ```
 
 **Response:**
 
 ```json
 {
-  "message": "Payload received successfully",
-  "data": { ... },
-  "email_id": "550e8400-e29b-41d4-a716-446655440000"
+  "message": "Email 550e8400-e29b-41d4-a716-446655440000 received and published successfully",
+  "data": {
+    "email_type": "welcome",
+    "subject": "Welcome to Our Platform",
+    "email_template": "default_template",
+    "email_data": {
+      "name": "John Doe",
+      "company": "Acme Corp"
+    },
+    "priority_level": 1
+  },
+  "email_id": "550e8400-e29b-41d4-a716-446655440000",
+  "attachments_processed": 2
 }
 ```
 
