@@ -1,5 +1,9 @@
 # Email Queue Service
 
+[![Release](https://img.shields.io/github/v/release/marksxiety/email-queue-service)](https://github.com/marksxiety/email-queue-service/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.8%2B-orange)](https://www.rabbitmq.com/)
+
 A centralized email delivery microservice designed to decouple email-sending from automation systems. Routes all email requests through a single service that handles queuing, reliability, and delivery via SMTP.
 
 ## Architecture
@@ -70,13 +74,13 @@ Key configuration sections:
 **Start the FastAPI service:**
 
 ```bash
-python app/main.py
+py -m app.api_server
 ```
 
 **Start the worker:**
 
 ```bash
-python app/workers/worker.py
+py -m app.worker
 ```
 
 ## Usage
@@ -145,4 +149,4 @@ attachments: [file1.pdf, file2.jpg] (optional)
 
 ## License
 
-MIT
+[MIT License](./LICENSE).
