@@ -133,6 +133,13 @@ class EmailQueueRequest(BaseModel):
             error_msg = f"Template '{template_name}' does not exist in templates folders: {str(e)}"
             raise ValueError(error_msg)
 
+class QueueEmailResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[Dict[str, Any]] = None
+    email_id: Optional[str] = None
+    attachments_processed: Optional[int] = None
+
 app = FastAPI()
 
 @app.post("/api/v1/emails/queue")
@@ -143,22 +150,23 @@ async def queue_email(
     email_data: str = Form(...),  # This will be JSON stringified
     priority_level: int = Form(...),
     attachments: Optional[List[UploadFile]] = File(None)
-):
+) -> QueueEmailResponse:
     try:
         # Decode the JSON stringified email_data
         # Handle both regular JSON and escaped JSON strings
         email_data_dict = json.loads(email_data)
-        
+
         # If the result contains an "email_data" key, extract it
         if isinstance(email_data_dict, dict) and "email_data" in email_data_dict:
             email_data_dict = email_data_dict["email_data"]
-            
+
     except json.JSONDecodeError as e:
         print_logging("error", f"Invalid JSON in email_data: {str(e)}")
-        return {
-            "message": "Invalid JSON format in email_data field",
-            "data": None
-        }
+        return QueueEmailResponse(
+            success=False,
+            message="Invalid JSON format in email_data field",
+            data=None
+        )
     
     # Create payload
     payload_dict = {
@@ -174,19 +182,21 @@ async def queue_email(
         payload = EmailQueueRequest(**payload_dict)
     except Exception as e:
         print_logging("error", f"Payload validation failed: {str(e)}")
-        return {
-            "message": f"Payload validation failed: {str(e)}",
-            "data": None
-        }
-    
+        return QueueEmailResponse(
+            success=False,
+            message=f"Payload validation failed: {str(e)}",
+            data=None
+        )
+
     # Insert email queue entry
     email_data = insert_email_queues(payload)
-    
+
     if not email_data:
-        return {
-            "message": "Failed to register the request into email queue",
-            "data": None
-        }
+        return QueueEmailResponse(
+            success=False,
+            message="Failed to register the request into email queue",
+            data=None
+        )
     
     email_queue_id = email_data["id"]
     attachment_count = 0
@@ -197,23 +207,22 @@ async def queue_email(
     
     # Publish to RabbitMQ after attachments are processed
     published = publish_to_rabbitmq(email_data, payload.priority_level)
-    
-    response = {
-        "data": payload.model_dump(),
-        "email_id": email_data["id"]
-    }
-        
+
     if published:
-        response['message'] = f"Email {email_queue_id} received and published successfully"
+        message = f"Email {email_queue_id} received and published successfully"
+        success = True
     else:
-        fail_message = f"Email {email_queue_id} inserted but failed to publish to queue"
-        response['message'] = fail_message
-        print_logging('critical', fail_message)
-    
-    if attachments:
-        response["attachments_processed"] = attachment_count
-    
-    return response
+        message = f"Email {email_queue_id} inserted but failed to publish to queue"
+        success = False
+        print_logging('critical', message)
+
+    return QueueEmailResponse(
+        success=success,
+        message=message,
+        data=payload.model_dump(),
+        email_id=email_queue_id,
+        attachments_processed=attachment_count if attachments else None
+    )
     
 if __name__ == '__main__':
     uvicorn.run(app, host=config.API_HOST, port=config.API_PORT)
