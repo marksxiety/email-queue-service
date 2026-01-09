@@ -109,3 +109,34 @@ def insert_email_attachments(email_queue_id, file_name, file_path, mime_type, fi
         if cursor:
             cursor.close()
         conn.close()
+        
+def is_has_file_attachments(email_queue_id):
+    conn = connect()
+    if conn is None:
+        print_logging("error", f"Database connection unavailable. Cannot check if there's email attachment for {email_queue_id}")
+        return []
+
+    cursor = None
+    try:
+        query = "SELECT file_name, file_path FROM email_attachments WHERE email_queue_id = %s"      
+        cursor = conn.cursor()
+        cursor.execute(query, (email_queue_id,))
+        
+        result = cursor.fetchall()
+        
+        attachments = []
+        for row in result:
+            attachments.append({
+                "file_name": row[0],
+                "file_path": row[1]
+            })
+        
+        return attachments
+        
+    except Exception as e:
+        print_logging("error", f"Database error while checking if there's email attachment for {email_queue_id}: {str(e)}")
+        return []
+    finally:
+        if cursor:
+            cursor.close()
+        conn.close()
