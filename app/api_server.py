@@ -19,6 +19,7 @@ def save_attachment_to_disk(file_content: bytes, filename: str, email_queue_id: 
     """
     Save attachment to disk and return the file path
     Organize files by email_queue_id to avoid conflicts
+    Handles duplicate filenames by appending counter (1.pdf, 2.pdf, etc.)
     """
     # Define base upload directory
     upload_dir = Path(config.UPLOAD_DIR)
@@ -27,10 +28,20 @@ def save_attachment_to_disk(file_content: bytes, filename: str, email_queue_id: 
     email_dir = upload_dir / str(email_queue_id)
     email_dir.mkdir(parents=True, exist_ok=True)
     
-    # Generate unique filename to avoid conflicts
-    file_extension = Path(filename).suffix
-    unique_filename = f"{uuid.uuid4()}{file_extension}"
-    file_path = email_dir / unique_filename
+    # Handle duplicate filenames
+    file_path = email_dir / filename
+    counter = 1
+    
+    while file_path.exists():
+        name = filename.rsplit('.', 1)
+        if len(name) == 2:
+            base, ext = name
+            new_filename = f"{base} {counter}.{ext}"
+        else:
+            new_filename = f"{filename} {counter}"
+        
+        file_path = email_dir / new_filename
+        counter += 1
     
     # Write file to disk
     with open(file_path, 'wb') as f:
