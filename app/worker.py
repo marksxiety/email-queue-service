@@ -1,20 +1,34 @@
 from app.utils.logger import print_logging
-from app.database.transactions import update_email_status
+from app.database.transactions import update_email_status, is_has_file_attachments
 import pandas as pd
 import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 import json
 from app.config import config, jinja_env
 import time
 import pika
+import os
+
+def get_file_attachments(email_queue_id):
+    attachments_metadata = is_has_file_attachments(email_queue_id)
+    file_list = []
+    
+    for attachment in attachments_metadata:
+        file_path = attachment["file_path"]
+        if os.path.exists(file_path):
+            file_list.append(file_path)
+    
+    return file_list
         
 def render_email_template(template_name, data):
     template = jinja_env.get_template(f"{template_name}.html")
     return template.render(**data)
 
-def send_email_via_smtp(subject, body, to_address, cc_addresses=None, bcc_addresses=None):
+def send_email_via_smtp(subject, body, to_address, cc_addresses=None, bcc_addresses=None, attachments = []):
     smtp_server = config.SMTP_HOST
     port = config.SMTP_PORT
     sender_email = config.SMTP_USER
@@ -39,6 +53,22 @@ def send_email_via_smtp(subject, body, to_address, cc_addresses=None, bcc_addres
 
     message["Subject"] = str(subject)
     message.attach(MIMEText(body, "html"))
+
+    for file_path in attachments:
+        if os.path.exists(file_path):
+            with open(file_path, 'rb') as attachment_file:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment_file.read())
+            
+            encoders.encode_base64(part)
+            
+            filename = os.path.basename(file_path)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename= {filename}'
+            )
+            
+            message.attach(part)
 
     all_recipients = to_list.copy()
     if cc_addresses:
@@ -93,10 +123,11 @@ def callback(ch, method, properties, body):
                 print_logging("error", f"Invalid JSON for email {email_id}: {str(e)}")
                 ch.basic_ack(delivery_tag=method.delivery_tag)
                 return
-        
+            
+        attachments = get_file_attachments(email_id)
         body_content = render_email_template(template_name, email_content)
         
-        success, message = send_email_via_smtp(subject, body_content, to_address, cc_addresses, bcc_addresses)
+        success, message = send_email_via_smtp(subject, body_content, to_address, cc_addresses, bcc_addresses, attachments)
         if success:
             print_logging("info", f"Email {email_id} sent successfully!")
             update_email_status(1, email_id)
