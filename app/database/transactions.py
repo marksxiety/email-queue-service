@@ -35,15 +35,19 @@ def insert_email_queues(payload):
         cursor.execute(query, (payload.email_type,))
         result = cursor.fetchone()
         
+        to_address = payload.to_address if payload.to_address else result[0]
+        cc_addresses = payload.cc_addresses if payload.cc_addresses else result[1]
+        bcc_addresses = payload.bcc_addresses if payload.bcc_addresses else result[2]
+        
         email_data = {
             "id": email_id,
             "email_type": payload.email_type,
             "subject": payload.subject,
             "email_template": payload.email_template,
             "email_data": email_data_json,
-            "to_address": result[0],
-            "cc_addresses": result[1],
-            "bcc_addresses": result[2]
+            "to_address": to_address,
+            "cc_addresses": cc_addresses,
+            "bcc_addresses": bcc_addresses
         }
         return email_data
 
