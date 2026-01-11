@@ -16,6 +16,9 @@ class EmailQueueRequest(BaseModel):
     email_template: Any
     email_data: Dict[str, Any]
     priority_level: int
+    to_address: Optional[List[str]] = None
+    cc_addresses: Optional[List[str]] = None
+    bcc_addresses: Optional[List[str]] = None
 
     @field_validator('email_template')
     @classmethod
@@ -45,6 +48,9 @@ async def queue_email(
     email_template: str = Form(...),
     email_data: str = Form(...),
     priority_level: int = Form(...),
+    to_addresses: Optional[List[str]] = Form(None),
+    cc_addresses: Optional[List[str]] = Form(None),
+    bcc_addresses: Optional[List[str]] = Form(None),
     attachments: Optional[List[UploadFile]] = File(None)
 ) -> QueueEmailResponse:
     try:
@@ -66,7 +72,10 @@ async def queue_email(
         "subject": subject,
         "email_template": email_template,
         "email_data": email_data_dict,
-        "priority_level": priority_level
+        "priority_level": priority_level,
+        "to_addresses": to_addresses,
+        "cc_addresses": cc_addresses,
+        "bcc_addresses": bcc_addresses
     }
     
     try:
