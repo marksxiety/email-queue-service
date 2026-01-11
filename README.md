@@ -3,10 +3,26 @@
 [![Release](https://img.shields.io/github/v/release/marksxiety/email-queue-service)](https://github.com/marksxiety/email-queue-service/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.8%2B-orange)](https://www.rabbitmq.com/)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
 
-A centralized email delivery microservice designed to decouple email-sending from automation systems. Routes all email requests through a single service that handles queuing, reliability, and delivery via SMTP.
+A robust, centralized email delivery microservice that decouples email operations from your applications. Built with FastAPI and RabbitMQ, it provides reliable, priority-based email queuing with template support and attachment handling.
 
-## Architecture
+---
+
+## Why Use This Service?
+
+**Before:** Each automation system manages its own email logic, SMTP connections, and retry mechanisms.
+
+**After:** One centralized service handles all email operations with:
+- **Reliability** - RabbitMQ ensures no messages are lost
+- **Priority Management** - Critical emails get delivered first
+- **Template Consistency** - Centralized email templates
+- **Status Tracking** - Monitor email delivery in real-time
+- **Simplified Integration** - Single API endpoint for all systems
+
+---
+
+## Architecture Overview
 
 ```mermaid
 graph LR
@@ -34,119 +50,126 @@ graph LR
     G --> H
 ```
 
-## Features
+**How it works:**
+1. Applications send email requests to the API
+2. API validates and stores the request in the database
+3. Message is published to the appropriate RabbitMQ queue based on priority
+4. Workers consume messages and send emails via SMTP
+5. Database is updated with delivery status
 
-- **Centralized API** - Single endpoint for all email requests
-- **Priority Queues** - High, normal, and low priority email queues
-- **Reliability** - RabbitMQ ensures no lost messages
+---
 
-## Prerequisites
+## Key Features
 
-- Python 3.8+
-- RabbitMQ 3.8+
-- SMTP Server
+### Core Functionality
+- **Priority-Based Queues** - Three-tier priority system (high, normal, low)
+- **Dynamic Recipients** - Override default recipients on a per-request basis
+- **File Attachments** - Support for multiple file types (PDF, DOCX, images, etc.)
+- **Template Engine** - Jinja2-powered email templates with dynamic data
+- **Status Tracking** - Real-time monitoring of email delivery status
+- **Reliable Delivery** - RabbitMQ-backed message persistence
 
-## Setup
+### Technical Features
+- RESTful API built with FastAPI
+- PostgreSQL database for email tracking
+- Multipart form-data support for file uploads
+- Configurable SMTP server integration
+- Environment-based configuration
 
-### 1. Clone and Install Dependencies
+---
 
+## Quick Start
+
+### Prerequisites
+
+Ensure you have the following installed:
+- **Python** 3.8 or higher
+- **RabbitMQ** 3.8 or higher
+- **PostgreSQL** database
+- **SMTP Server** (Gmail, SendGrid, etc.)
+
+### Installation
+
+**1. Clone the repository**
 ```bash
 git clone https://github.com/marksxiety/email-queue-service.git
 cd email-queue-service
+```
+
+**2. Install dependencies**
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment Variables
-
-Copy `.env.example` to `.env` and update with your settings:
-
+**3. Configure environment variables**
 ```bash
 cp .env.example .env
 ```
 
-Key configuration sections:
-- **API**: Host and port settings
-- **RabbitMQ**: Connection credentials and queue names
-- **SMTP**: Mail server details
+Edit `.env` with your configuration:
 
-### 3. Start Services
+```env
+# API Configuration
+API_HOST=0.0.0.0
+API_PORT=8000
 
-**Start the FastAPI service:**
+# RabbitMQ Configuration
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USER=guest
+RABBITMQ_PASS=guest
 
+# SMTP Configuration
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=email_queue
+DB_USER=postgres
+DB_PASS=your-password
+
+# Upload Configuration
+UPLOAD_DIR=./uploads
+```
+
+**4. Initialize the database**
+
+See **[DATABASE.md](./app/database/DATABASE.md)** for migration instructions.
+
+### Running the Service
+
+**Start the API server:**
 ```bash
-py -m app.api_server
+python -m app.api_server
 ```
 
-**Start the worker:**
+The API will be available at `http://localhost:8000`
 
+**Start the worker (in a separate terminal):**
 ```bash
-py -m app.worker
+python -m app.worker
 ```
 
-## Usage
+The worker will begin consuming messages from RabbitMQ queues.
 
-### Queue Email Request
+---
 
-**Endpoint:** `POST /api/v1/emails/queue`
+## API Usage
 
-**Content-Type:** `multipart/form-data` (required - JSON format not supported)
+For detailed API documentation, request examples, and integration guides, see **[USAGE.md](./USAGE.md)**.
 
-**Request Body (form-data):**
+---
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| email_type | string | Yes | Type of email (e.g., "welcome", "notification") |
-| subject | string | Yes | Email subject line |
-| email_template | string | Yes | Template name (without .html extension) |
-| email_data | string (JSON) | Yes | Template variables as JSON string |
-| priority_level | int | Yes | Priority level (1=high, 2=normal, 3-10=low) |
-| attachments | file[] | No | Optional attachment files |
+## Documentation
 
-**Example form-data:**
+**[API Documentation](./USAGE.md)** - Comprehensive API usage guide with examples
 
-```
-email_type: welcome
-subject: Welcome to Our Platform
-email_template: default_template
-email_data: {"name": "John Doe", "company": "Acme Corp"}
-priority_level: 1
-attachments: [file1.pdf, file2.jpg] (optional)
-```
-
-**Response:**
-
-```json
-{
-  "message": "Email 550e8400-e29b-41d4-a716-446655440000 received and published successfully",
-  "data": {
-    "email_type": "welcome",
-    "subject": "Welcome to Our Platform",
-    "email_template": "default_template",
-    "email_data": {
-      "name": "John Doe",
-      "company": "Acme Corp"
-    },
-    "priority_level": 1
-  },
-  "email_id": "550e8400-e29b-41d4-a716-446655440000",
-  "attachments_processed": 2
-}
-```
-
-### Priority Levels
-
-- **1**: High priority queue (`email.high`)
-- **2**: Normal priority queue (`email.normal`)
-- **3-10**: Low priority queue (`email.low`)
-
-## Message Flow
-
-1. Client submits email request via HTTP
-2. API validates request
-3. Message published to RabbitMQ based on priority
-4. Worker consumes from queues (high → normal → low)
-5. Email sent via SMTP
+---
 
 ## License
 
-[MIT License](./LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
