@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.8%2B-orange)](https://www.rabbitmq.com/)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
+[![Tests](https://github.com/marksxiety/email-queue-service/actions/workflows/tests.yml/badge.svg)](https://github.com/marksxiety/email-queue-service/actions/workflows/tests.yml)
 
 A robust, centralized email delivery microservice that decouples email operations from your applications. Built with FastAPI and RabbitMQ, it provides reliable, priority-based email queuing with template support and attachment handling.
 
@@ -158,15 +159,11 @@ The worker will begin consuming messages from RabbitMQ queues.
 
 ---
 
-## API Usage
-
-For detailed API documentation, request examples, and integration guides, see **[USAGE.md](./USAGE.md)**.
-
----
-
 ## Documentation
 
-**[API Documentation](./USAGE.md)** - Comprehensive API usage guide with examples
+**[USAGE.md](./USAGE.md)** - Complete API documentation with examples
+
+**[TEST.md](./tests/TEST.md)** - Testing guide and test coverage
 
 ---
 
