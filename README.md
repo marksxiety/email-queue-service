@@ -1,10 +1,10 @@
 # Email Queue Service
 
+[![Tests](https://github.com/marksxiety/email-queue-service/actions/workflows/tests.yml/badge.svg)](https://github.com/marksxiety/email-queue-service/actions/workflows/tests.yml)
 [![Release](https://img.shields.io/github/v/release/marksxiety/email-queue-service)](https://github.com/marksxiety/email-queue-service/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.8%2B-orange)](https://www.rabbitmq.com/)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
-[![CI](https://github.com/marksxiety/email-queue-service/actions/badge.svg)](https://github.com/marksxiety/email-queue-service/actions)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-3.8%2B-orange)](https://www.rabbitmq.com/)
 
 A robust, centralized email delivery microservice that decouples email operations from your applications. Built with FastAPI and RabbitMQ, it provides reliable, priority-based email queuing with template support and attachment handling.
 
