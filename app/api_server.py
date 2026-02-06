@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from app.config import config
 import uvicorn
 from pydantic import BaseModel, field_validator
@@ -8,6 +8,14 @@ from app.utils.attachment_processor import process_attachments
 from app.utils.rabbitmq_publisher import publish_to_rabbitmq
 from app.utils.logger import print_logging
 import json
+import time
+from datetime import datetime
+from functools import wraps
+
+if config.RATE_LIMIT_ENABLED:
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
 
 
 class EmailQueueRequest(BaseModel):
@@ -40,9 +48,32 @@ class QueueEmailResponse(BaseModel):
     attachments_processed: Optional[int] = None
 
 app = FastAPI()
+app_start_time = time.time()
+
+if config.RATE_LIMIT_ENABLED:
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=[],
+        headers_enabled=True
+    )
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+def rate_limit_exempt_with_grace_period(f):
+    @wraps(f)
+    async def wrapper(*args, **kwargs):
+        elapsed = time.time() - app_start_time
+        if elapsed < config.RATE_LIMIT_GRACE_PERIOD_SECONDS:
+            return await f(*args, **kwargs)
+        return f(*args, **kwargs)
+    return wrapper
 
 @app.post("/api/v1/emails/queue")
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute") if config.RATE_LIMIT_ENABLED else lambda f: f
+@limiter.limit(f"{config.RATE_LIMIT_PER_HOUR}/hour") if config.RATE_LIMIT_ENABLED else lambda f: f
+@rate_limit_exempt_with_grace_period if config.RATE_LIMIT_ENABLED else lambda f: f
 async def queue_email(
+    request: Request,
     email_type: str = Form(...),
     subject: str = Form(...),
     email_template: str = Form(...),
