@@ -37,8 +37,15 @@ class Config:
     
     MAX_RETRIES = int(os.getenv("MAX_RETRIES", "5"))
     RETRY_DELAY_SECONDS = int(os.getenv("RETRY_DELAY_SECONDS", "30"))
-    
+
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
+
+    RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "True") == "True"
+    RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "10"))
+    RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "100"))
+    RATE_LIMIT_GLOBAL_PER_MINUTE = int(os.getenv("RATE_LIMIT_GLOBAL_PER_MINUTE", "500"))
+    RATE_LIMIT_GLOBAL_PER_HOUR = int(os.getenv("RATE_LIMIT_GLOBAL_PER_HOUR", "5000"))
+    RATE_LIMIT_GRACE_PERIOD_SECONDS = int(os.getenv("RATE_LIMIT_GRACE_PERIOD_SECONDS", "300"))
     
     ALLOWED_MIME_TYPES = {
         "application/pdf",
