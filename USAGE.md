@@ -159,7 +159,16 @@ attachments: [summary.xlsx]
 
 ## Response Format
 
-### Success Response
+### HTTP Status Codes
+
+| Status Code | Description |
+|-------------|-------------|
+| **201** | Email queued and published successfully |
+| **400** | Invalid JSON format or payload validation failed |
+| **422** | Email type is not registered in the system |
+| **500** | Database insertion failed or queue publishing error |
+
+### Success Response (201 Created)
 
 ```json
 {
@@ -180,6 +189,75 @@ attachments: [summary.xlsx]
   },
   "email_id": "550e8400-e29b-41d4-a716-446655440000",
   "attachments_processed": 2
+}
+```
+
+### Error Response (400 Bad Request)
+
+Invalid JSON in `email_data` field:
+
+```json
+{
+  "success": false,
+  "message": "Invalid JSON format in email_data field",
+  "data": null
+}
+```
+
+Payload validation failed:
+
+```json
+{
+  "success": false,
+  "message": "Payload validation failed: Template 'template.html' does not exist in templates folders: ...",
+  "data": null
+}
+```
+
+### Error Response (422 Unprocessable Entity)
+
+Email type not registered:
+
+```json
+{
+  "success": false,
+  "message": "Email type is not registered"
+}
+```
+
+### Error Response (500 Internal Server Error)
+
+Database insertion failed:
+
+```json
+{
+  "success": false,
+  "message": "Failed to register the request into email queue",
+  "data": null
+}
+```
+
+Queue publishing failed:
+
+```json
+{
+  "success": false,
+  "message": "Email 550e8400-e29b-41d4-a716-446655440000 inserted but failed to publish to queue",
+  "data": {
+    "email_type": "welcome",
+    "subject": "Welcome to Our Platform",
+    "email_template": "default_template",
+    "email_data": {
+      "name": "John Doe",
+      "company": "Acme Corp"
+    },
+    "priority_level": 1,
+    "to_address": ["user1@example.com", "user2@example.com"],
+    "cc_addresses": ["cc@example.com"],
+    "bcc_addresses": ["bcc@example.com"]
+  },
+  "email_id": "550e8400-e29b-41d4-a716-446655440000",
+  "attachments_processed": 0
 }
 ```
 
