@@ -27,14 +27,14 @@ A robust, centralized email delivery microservice that decouples email operation
 
 ```mermaid
 graph LR
-    subgraph Clients
-        A[Automation A]
-        B[Automation B]
-        C[Automation C]
+    subgraph Clients [Upstream Clients]
+        A[Client App]
+        B[External Service]
+        C[Internal Tool]
     end
 
-    subgraph Email Queue Service
-        D[API]
+    subgraph EmailQueue [Email Queue Service]
+        D[API Endpoint]
         E[(Database)]
         F[RabbitMQ]
         G[Worker]
