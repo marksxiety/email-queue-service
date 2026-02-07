@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi import FastAPI, UploadFile, File, Form, Request, Response
 from app.config import config
 import uvicorn
 from pydantic import BaseModel, field_validator
@@ -65,7 +65,7 @@ def rate_limit_exempt_with_grace_period(f):
         elapsed = time.time() - app_start_time
         if elapsed < config.RATE_LIMIT_GRACE_PERIOD_SECONDS:
             return await f(*args, **kwargs)
-        return f(*args, **kwargs)
+        return await f(*args, **kwargs)
     return wrapper
 
 @app.post("/api/v1/emails/queue")
@@ -73,6 +73,7 @@ def rate_limit_exempt_with_grace_period(f):
 @limiter.limit(f"{config.RATE_LIMIT_PER_HOUR}/hour") if config.RATE_LIMIT_ENABLED else lambda f: f
 @rate_limit_exempt_with_grace_period if config.RATE_LIMIT_ENABLED else lambda f: f
 async def queue_email(
+    response: Response,
     request: Request,
     email_type: str = Form(...),
     subject: str = Form(...),
