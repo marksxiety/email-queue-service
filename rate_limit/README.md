@@ -1,6 +1,8 @@
 # Rate Limiting Tests
 
-This directory contains test scripts for verifying the rate limiting functionality of the Email Queue Service.
+**⚠️ MANUAL FUNCTIONAL TESTS ONLY - NOT PART OF ORIGINAL REPO**
+
+This directory contains manual functional test scripts for verifying the rate limiting functionality of the Email Queue Service. These scripts are intended for manual testing purposes only and are not automated unit tests.
 
 ## Prerequisites
 
@@ -8,12 +10,13 @@ This directory contains test scripts for verifying the rate limiting functionali
 - `requests` library installed: `pip install requests`
 - Email Queue Service running on the configured API_HOST and API_PORT (defaults to `http://localhost:8000`)
 - `.env` file with API_HOST and API_PORT configuration
+- **Update test payload content** to match your registered email types before running tests
 
-## Test Files
+## Functional Test Scripts
 
 ### 1. `test_rate_limit.py`
 
-**Purpose:** Basic rate limit test that makes multiple requests to trigger the rate limit.
+**Purpose:** Basic functional test that makes multiple requests to trigger the rate limit.
 
 **Usage:**
 ```bash
@@ -28,7 +31,7 @@ python rate_limit/test_rate_limit.py
 
 ### 2. `test_rate_limit_response.py`
 
-**Purpose:** Detailed test that shows rate limit headers and response body structure.
+**Purpose:** Detailed functional test that shows rate limit headers and response body structure.
 
 **Usage:**
 ```bash
@@ -43,6 +46,22 @@ python rate_limit/test_rate_limit_response.py
   - `X-RateLimit-Remaining`
   - `X-RateLimit-Reset`
   - `Retry-After`
+
+## Test Configuration
+
+**Important:** Update the test payload in each script to match your registered email types:
+
+```python
+payload = {
+    "email_type": "your_registered_email_type",  # Update this
+    "subject": "Rate Limit Test",
+    "email_template": "your_template_name",      # Update this
+    "email_data": json.dumps({"test": "data"}),
+    "priority_level": 2,
+}
+```
+
+The default test uses `"default_template"` which may not exist in your system. Ensure the `email_type` and `email_template` values correspond to valid, registered email types in your email template configuration.
 
 ## Rate Limit Configuration
 
@@ -71,6 +90,10 @@ X-RateLimit-Remaining: 0
 X-RateLimit-Reset: 1770389067.6997728
 Retry-After: 58
 ```
+
+## Manual Testing Notes
+
+These scripts must be run manually with the API server running. They are not integrated with any automated test suite.
 
 ## Troubleshooting
 
