@@ -144,3 +144,27 @@ def is_has_file_attachments(email_queue_id):
         if cursor:
             cursor.close()
         conn.close()
+        
+def check_email_type_registration(email_type: str):
+    conn = connect()
+    if conn is None:
+        print_logging("error", f"Database connection unavailable. Cannot check email type registration for {email_type}")
+        return False
+
+    cursor = None
+    try:
+        query = "SELECT 1 FROM email_types WHERE type = %s"
+        cursor = conn.cursor()
+        cursor.execute(query, (email_type,))
+
+        result = cursor.fetchall()
+
+        return len(result) > 0
+
+    except Exception as e:
+        print_logging("error", f"Database error while checking email type registration for {email_type}: {str(e)}")
+        return False
+    finally:
+        if cursor:
+            cursor.close()
+        conn.close()
