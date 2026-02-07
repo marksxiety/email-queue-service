@@ -3,7 +3,7 @@ from app.config import config
 import uvicorn
 from pydantic import BaseModel, field_validator
 from typing import Dict, Any, Optional, List
-from app.database.transactions import insert_email_queues
+from app.database.transactions import insert_email_queues, check_email_type_registration
 from app.utils.attachment_processor import process_attachments
 from app.utils.rabbitmq_publisher import publish_to_rabbitmq
 from app.utils.logger import print_logging
@@ -24,7 +24,7 @@ class EmailQueueRequest(BaseModel):
     email_template: Any
     email_data: Dict[str, Any]
     priority_level: int
-    to_address: Optional[List[str]] = None
+    to_addresses: Optional[List[str]] = None
     cc_addresses: Optional[List[str]] = None
     bcc_addresses: Optional[List[str]] = None
 
@@ -118,6 +118,17 @@ async def queue_email(
             success=False,
             message=f"Payload validation failed: {str(e)}",
             data=None
+        )
+        
+    # check first if the payload's email type is registered to avoid PK and FK relationship
+    is_email_type_exists = check_email_type_registration(payload.email_type)
+    
+    if not is_email_type_exists:
+        success = False
+        message = "Email type is not registered"
+        return QueueEmailResponse(
+            success=success,
+            message=message
         )
 
     email_data = insert_email_queues(payload)
