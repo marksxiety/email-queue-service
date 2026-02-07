@@ -93,6 +93,7 @@ async def queue_email(
 
     except json.JSONDecodeError as e:
         print_logging("error", f"Invalid JSON in email_data: {str(e)}")
+        response.status_code = 400
         return QueueEmailResponse(
             success=False,
             message="Invalid JSON format in email_data field",
@@ -114,6 +115,7 @@ async def queue_email(
         payload = EmailQueueRequest(**payload_dict)
     except Exception as e:
         print_logging("error", f"Payload validation failed: {str(e)}")
+        response.status_code = 400
         return QueueEmailResponse(
             success=False,
             message=f"Payload validation failed: {str(e)}",
@@ -124,16 +126,16 @@ async def queue_email(
     is_email_type_exists = check_email_type_registration(payload.email_type)
     
     if not is_email_type_exists:
-        success = False
-        message = "Email type is not registered"
+        response.status_code = 422
         return QueueEmailResponse(
-            success=success,
-            message=message
+            success=False,
+            message="Email type is not registered"
         )
 
     email_data = insert_email_queues(payload)
 
     if not email_data:
+        response.status_code = 500
         return QueueEmailResponse(
             success=False,
             message="Failed to register the request into email queue",
@@ -149,20 +151,24 @@ async def queue_email(
     published = publish_to_rabbitmq(email_data, payload.priority_level)
 
     if published:
-        message = f"Email {email_queue_id} received and published successfully"
-        success = True
+        response.status_code = 201
+        return QueueEmailResponse(
+            success=True,
+            message=f"Email {email_queue_id} received and published successfully",
+            data=payload.model_dump(),
+            email_id=email_queue_id,
+            attachments_processed=attachment_count if attachments else None
+        )
     else:
-        message = f"Email {email_queue_id} inserted but failed to publish to queue"
-        success = False
-        print_logging('critical', message)
-
-    return QueueEmailResponse(
-        success=success,
-        message=message,
-        data=payload.model_dump(),
-        email_id=email_queue_id,
-        attachments_processed=attachment_count if attachments else None
-    )
+        response.status_code = 500
+        print_logging('critical', f"Email {email_queue_id} inserted but failed to publish to queue")
+        return QueueEmailResponse(
+            success=False,
+            message=f"Email {email_queue_id} inserted but failed to publish to queue",
+            data=payload.model_dump(),
+            email_id=email_queue_id,
+            attachments_processed=attachment_count if attachments else None
+        )
     
 if __name__ == '__main__':
     uvicorn.run(app, host=config.API_HOST, port=config.API_PORT)
