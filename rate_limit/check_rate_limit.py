@@ -23,7 +23,10 @@ def test_rate_limiting():
         "subject": "Rate Limit Test",
         "email_template": "default_template",
         "email_data": json.dumps({"test": "data"}),
-        "priority_level": 2
+        "priority_level": 2,
+        "to_addresses": ["test@example.com"],
+        "cc_addresses": ["cc@example.com"],
+        "bcc_addresses": ["bcc@example.com"]
     }
 
     # Make 15 requests (should hit the rate limit of 10 per minute)
