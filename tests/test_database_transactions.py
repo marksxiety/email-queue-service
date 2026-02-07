@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock, Mock
-from app.database.transactions import insert_email_queues, update_email_status, insert_email_attachments, is_has_file_attachments
+from app.database.transactions import insert_email_queues, update_email_status, insert_email_attachments, is_has_file_attachments, check_email_type_registration
 
 
 class TestInsertEmailQueues:
@@ -269,6 +269,67 @@ class TestIsHasFileAttachments:
         result = is_has_file_attachments(123)
 
         assert result == []
+        mock_print_logging.assert_called_once()
+        mock_cursor.close.assert_called_once()
+        mock_conn.close.assert_called_once()
+
+
+class TestCheckEmailTypeRegistration:
+    @patch('app.database.transactions.connect')
+    @patch('app.database.transactions.print_logging')
+    def test_check_email_type_registration_exists(self, mock_print_logging, mock_connect):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [(1,)]
+
+        result = check_email_type_registration('welcome')
+
+        assert result is True
+        mock_cursor.execute.assert_called_once_with("SELECT 1 FROM email_types WHERE type = %s", ('welcome',))
+        mock_cursor.close.assert_called_once()
+        mock_conn.close.assert_called_once()
+
+    @patch('app.database.transactions.connect')
+    @patch('app.database.transactions.print_logging')
+    def test_check_email_type_registration_not_exists(self, mock_print_logging, mock_connect):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        result = check_email_type_registration('unregistered_type')
+
+        assert result is False
+        mock_cursor.execute.assert_called_once_with("SELECT 1 FROM email_types WHERE type = %s", ('unregistered_type',))
+        mock_cursor.close.assert_called_once()
+        mock_conn.close.assert_called_once()
+
+    @patch('app.database.transactions.connect')
+    @patch('app.database.transactions.print_logging')
+    def test_check_email_type_registration_connection_failure(self, mock_print_logging, mock_connect):
+        mock_connect.return_value = None
+
+        result = check_email_type_registration('welcome')
+
+        assert result is False
+        mock_print_logging.assert_called_once()
+        assert "Database connection unavailable" in mock_print_logging.call_args[0][1]
+
+    @patch('app.database.transactions.connect')
+    @patch('app.database.transactions.print_logging')
+    def test_check_email_type_registration_exception(self, mock_print_logging, mock_connect):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = Exception('Database query failed')
+
+        result = check_email_type_registration('welcome')
+
+        assert result is False
         mock_print_logging.assert_called_once()
         mock_cursor.close.assert_called_once()
         mock_conn.close.assert_called_once()
