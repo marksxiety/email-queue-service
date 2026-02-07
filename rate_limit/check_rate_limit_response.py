@@ -11,14 +11,11 @@ API_PORT = os.getenv("API_PORT", "8000")
 API_URL = f"http://{API_HOST}:{API_PORT}/api/v1/emails/queue"
 
 payload = {
-    "email_type": "test",
+    "email_type": "default_template",
     "subject": "Rate Limit Response Test",
     "email_template": "default_template",
     "email_data": json.dumps({"test": "data"}),
     "priority_level": 2,
-    "to_addresses": ["test@example.com"],
-    "cc_addresses": ["cc@example.com"],
-    "bcc_addresses": ["bcc@example.com"]
 }
 
 print("Testing rate limit response...")
