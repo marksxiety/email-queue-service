@@ -22,6 +22,10 @@ def callback(ch, method, properties, body):
         bcc_addresses = parse_address_value(email_data["bcc_addresses"])
         email_content = email_data["email_data"]
         
+        MAX_RETRIES = config.MAX_RETRIES
+        RETRY_SLEEP = config.RETRY_DELAY_SECONDS
+        CURRENT_TRY = 0
+        
         if isinstance(email_content, str):
             try:
                 email_content = json.loads(email_content)
@@ -33,12 +37,23 @@ def callback(ch, method, properties, body):
         attachments = get_file_attachments(email_id)
         body_content = render_email_template(template_name, email_content)
         
-        success, message = send_email_via_smtp(subject, body_content, to_address, cc_addresses, bcc_addresses, attachments)
-        if success:
-            print_logging("info", f"Email {email_id} sent successfully!")
-            update_email_status(1, email_id)
-        else:
-            print_logging("error", f"Failed to send email {email_id} due to: {message}")
+        success = False
+        message = ""
+        
+        while CURRENT_TRY < MAX_RETRIES and not success:
+            CURRENT_TRY += 1
+            success, message = send_email_via_smtp(subject, body_content, to_address, cc_addresses, bcc_addresses, attachments)
+            
+            if success:
+                print_logging("info", f"Email {email_id} sent successfully on attempt {CURRENT_TRY}/{MAX_RETRIES}!")
+                update_email_status(1, email_id)
+            else:
+                print_logging("warning", f"Attempt {CURRENT_TRY}/{MAX_RETRIES} failed for email {email_id}: {message}")
+                if CURRENT_TRY < MAX_RETRIES:
+                    time.sleep(RETRY_SLEEP)
+        
+        if not success:
+            print_logging("error", f"Failed to send email {email_id} after {MAX_RETRIES} attempts due to: {message}")
             update_email_status(2, email_id)
         
         ch.basic_ack(delivery_tag=method.delivery_tag)
