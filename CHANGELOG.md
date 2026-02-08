@@ -2,22 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.3.0] - 2026-02-08
 
 ### Added
+- Retry mechanism in case the worker fails to process emails
 - Rate limiting functionality for API endpoints
 - Rate limiting configuration support
 - Email type validation to verify if email type is registered in database before processing
 - Database query function to verify email type existence
 - Unit tests for rate limiting and email type validation
 - Mock testing for API responses
-
-### Fixed
-- Added Response parameter for rate limiting and missing await
-- Renamed test file to prevent unit test failures in GitHub Actions
+- Unit tests for rate limiting response
+- Unit testing libraries and httpx dependency for TestClient in GitHub Actions
 
 ### Changed
-- Updated default email type upon installation
+- Clarified API service scope - available for any software, not limited to automations
+- Updated documentation with testing configuration and expected HTTP status codes
+- Used Open API standards for response HTTP status codes
 
 ---
 
