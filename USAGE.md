@@ -328,6 +328,17 @@ The API intelligently merges recipients between your request and the `email_type
   - **Images:** JPEG, PNG, GIF, BMP, WEBP, TIFF
 - Consider file size limits of recipient email servers
 
+### File Attachment Configuration
+
+File attachment security is configured in `app/config.py`:
+```python
+ALLOWED_MIME_TYPES = {...}
+ALLOWED_EXTENSIONS = {...}
+MAX_FILE_SIZE = 10485760  # 10MB
+```
+
+To add new file types, modify these configurations accordingly.
+
 **Recipient Management**
 - Validate email addresses before submission
 - Use BCC for bulk sends to protect recipient privacy
