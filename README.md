@@ -1,6 +1,6 @@
 # Email Queue Service
 
-[![Tests](https://github.com/marksxiety/email-queue-service/actions/workflows/tests.yml/badge.svg)](https://github.com/marksxiety/email-queue-service/actions/workflows/tests.yml)
+[![Tests](https://github.com/marksxiety/email-queue-service/actions/workflows/tests.yml/badge.svg)](https://github.com/marksxiety/email-queue-service/actions/workflows/tests)
 [![Release](https://img.shields.io/github/v/release/marksxiety/email-queue-service)](https://github.com/marksxiety/email-queue-service/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
@@ -23,7 +23,7 @@ A robust, centralized email delivery microservice that decouples email operation
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```mermaid
 graph LR
@@ -66,7 +66,7 @@ graph LR
 - **Priority-Based Queues** - Three-tier priority system (high, normal, low)
 - **Rate Limiting** - Per-IP rate limiting with configurable thresholds and grace period
 - **Dynamic Recipients** - Override default recipients on a per-request basis
-- **File Attachments** - Support for multiple file types (PDF, DOCX, images, etc.)
+- **File Attachments** - Support for multiple file types with security validation
 - **Template Engine** - Jinja2-powered email templates with dynamic data
 - **Status Tracking** - Real-time monitoring of email delivery status
 - **Reliable Delivery** - RabbitMQ-backed message persistence
@@ -77,100 +77,41 @@ graph LR
 - Multipart form-data support for file uploads
 - Configurable SMTP server integration
 - Environment-based configuration
+- Path traversal protection for file uploads
+- Magic byte verification for file type detection
 
 ---
 
-## Quick Start
+## File Attachment Limitations
 
-### Prerequisites
+The service enforces strict security measures for file attachments:
 
-Ensure you have the following installed:
-- **Python** 3.8 or higher
-- **RabbitMQ** 3.8 or higher
-- **PostgreSQL** database
-- **SMTP Server** (Gmail, SendGrid, etc.)
+### Allowed File Types
 
-### Installation
+| Category | Extensions | MIME Types |
+|----------|------------|------------|
+| **Documents** | `.pdf`, `.doc`, `.docx`, `.xls`, `.xlsx` | `application/pdf`, `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
+| **Text** | `.txt` | `text/plain` |
+| **Archives** | `.zip` | `application/zip` |
+| **Images** | `.jpg`, `.jpeg`, `.png`, `.gif`, `.bmp`, `.webp`, `.tiff` | `image/jpeg`, `image/png`, `image/gif`, `image/bmp`, `image/webp`, `image/tiff` |
 
-**1. Clone the repository**
-```bash
-git clone https://github.com/marksxiety/email-queue-service.git
-cd email-queue-service
-```
+### Security Measures
+1. **Magic Byte Verification** - File type is detected from actual content, not client-provided headers
+2. **Path Traversal Protection** - Filenames are sanitized to prevent directory traversal attacks
+3. **Extension Whitelist** - Only allowed extensions are accepted
+4. **File Size Limit** - Default maximum of 10MB per file (configurable via `MAX_FILE_SIZE`)
+5. **MIME Type Validation** - Double validation against both client-provided and detected MIME types
 
-**2. Install dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-**3. Configure environment variables**
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your configuration:
-
-```env
-# API Configuration
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# RabbitMQ Configuration
-RABBITMQ_HOST=localhost
-RABBITMQ_PORT=5672
-RABBITMQ_USER=guest
-RABBITMQ_PASS=guest
-
-# SMTP Configuration
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=email_queue
-DB_USER=postgres
-DB_PASS=your-password
-
-# Upload Configuration
-UPLOAD_DIR=./uploads
-
-# Rate Limiting Configuration
-RATE_LIMIT_ENABLED=True
-RATE_LIMIT_PER_MINUTE=10
-RATE_LIMIT_PER_HOUR=100
-RATE_LIMIT_GLOBAL_PER_MINUTE=500
-RATE_LIMIT_GLOBAL_PER_HOUR=5000
-RATE_LIMIT_GRACE_PERIOD_SECONDS=300
-```
-
-**4. Initialize the database**
-
-See **[DATABASE.md](./app/database/DATABASE.md)** for migration instructions.
-
-### Running the Service
-
-**Start the API server:**
-```bash
-python -m app.api_server
-```
-
-The API will be available at `http://localhost:8000`
-
-**Start the worker (in a separate terminal):**
-```bash
-python -m app.worker
-```
-
-The worker will begin consuming messages from RabbitMQ queues.
 
 ---
 
 ## Documentation
 
+**[SETUP.md](./SETUP.md)** - Installation and setup guide
+
 **[USAGE.md](./USAGE.md)** - Complete API documentation with examples
+
+**[DATABASE.md](./app/database/DATABASE.md)** - Database schema and migrations
 
 **[TEST.md](./tests/TEST.md)** - Testing guide and test coverage
 
@@ -178,4 +119,4 @@ The worker will begin consuming messages from RabbitMQ queues.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+[MIT](./LICENSE)
