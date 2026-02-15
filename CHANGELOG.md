@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-02-15
+
+### Security Fixes
+- Fixed path traversal vulnerability - filenames are now sanitized to prevent directory traversal attacks (e.g., ../../../etc/passwd)
+- Fixed spoofed MIME type vulnerability - file types are now detected using magic bytes instead of trusting client-provided headers
+- Added file extension whitelist validation to prevent uploading disallowed file types
+- Added file size limit enforcement to prevent denial-of-service attacks (default 10MB)
+- Added null filename validation to prevent errors with missing attachment filenames
+
+### Configuration
+- Added `ALLOWED_EXTENSIONS` set in `app/config.py` for file extension whitelist
+- Added `MAX_FILE_SIZE` environment variable in `app/config.py` (default 10MB)
+- Enhanced `ALLOWED_MIME_TYPES` with comprehensive file type coverage
+
+### Documentation
+- Created `SETUP.md` for installation and setup
+- Restructured `README.md` to focus on overview, architecture, and key features
+- Added file attachment security documentation
+- Moved file attachment configuration to `USAGE.md`
+
+---
+
 ## [1.3.0] - 2026-02-08
 
 ### Added
