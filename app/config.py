@@ -63,6 +63,25 @@ class Config:
         "image/tiff",
     }
     
+    ALLOWED_EXTENSIONS = {
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".txt",
+        ".zip",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".webp",
+        ".tiff",
+    }
+    
+    MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "10485760"))
+    
 config = Config()
 
 jinja_env = Environment(loader=ChoiceLoader([
